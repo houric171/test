@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IDX Screener</title>
+<style>
+:root{--bg:#0d1014;--panel:#151a21;--panel2:#1b212a;--line:#262d38;--text:#d7dce4;--mute:#8590a0;
+--acc:#5b8cff;--up:#22c55e;--down:#ef4444;--warn:#f5a524}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 Inter,"Segoe UI",system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:12px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{font-size:17px;margin:0;font-weight:650;letter-spacing:.2px}
+header .meta{color:var(--mute);font-size:12.5px}
+.badge{font-size:11px;padding:2px 8px;border-radius:99px;background:#2a2112;color:var(--warn);border:1px solid #4a3a1a}
+.badge.ok{background:#11251a;color:var(--up);border-color:#1d4a30}
+.wrap{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 53px)}
+aside{border-right:1px solid var(--line);background:var(--panel);padding:14px;overflow:auto}
+aside h3{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--mute);margin:16px 0 8px}
+aside h3:first-child{margin-top:0}
+.sc{padding:9px 10px;border-radius:8px;cursor:pointer;margin-bottom:4px;border:1px solid transparent}
+.sc:hover{background:var(--panel2)}
+.sc.active{background:#1a2440;border-color:#2c3f70}
+.sc b{display:block;font-weight:560;font-size:13.5px}
+.sc small{color:var(--mute);font-size:11.5px}
+main{padding:18px 22px;overflow:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute)}
+input,select{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:7px 9px;font:inherit;font-size:13px}
+input[type=number]{width:92px}
+input:focus,select:focus{outline:none;border-color:var(--acc)}
+input.name{width:280px;font-weight:600}
+button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer}
+button:hover{border-color:#3a4456}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.primary:hover{filter:brightness(1.1)}
+button.danger{color:var(--down)}
+button.sm{padding:5px 10px;font-size:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-top:12px}
+.cond{display:flex;gap:8px;align-items:center;margin:6px 0;flex-wrap:wrap}
+.cond .lbl{color:var(--mute);font-size:12px;width:34px}
+.chk{display:flex;gap:7px;align-items:center;font-size:13px;color:var(--text)}
+.desc{color:var(--mute);font-size:12.5px;margin-top:6px}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th{background:var(--panel2);color:#9fb3ff;text-align:right;padding:8px 10px;cursor:pointer;white-space:nowrap;position:sticky;top:0;font-weight:560;user-select:none}
+th:first-child,td:first-child{text-align:left}
+td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:#18202b}
+tbody tr.sel td{background:#1a2440}
+.pos{color:var(--up)}.neg{color:var(--down)}
+.tblwrap{max-height:460px;overflow:auto;border:1px solid var(--line);border-radius:8px}
+.status{color:var(--mute);font-size:12.5px}
+.chartbox{display:none}
+.chartbox canvas{width:100%;height:340px;display:block}
+.links a{color:var(--acc);font-size:12.5px;margin-right:14px;text-decoration:none}
+.empty{padding:30px;text-align:center;color:var(--mute)}
+@media(max-width:820px){.wrap{grid-template-columns:1fr}aside{border-right:0;border-bottom:1px solid var(--line)}input.name{width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1>IDX Screener</h1>
+  <span id="dataBadge" class="badge">memuat…</span>
+  <span id="dataMeta" class="meta"></span>
+</header>
+<div class="wrap">
+<aside>
+  <h3>Preset</h3><div id="listPreset"></div>
+  <h3>Screener saya</h3><div id="listCustom"></div>
+  <div class="row" style="margin-top:10px">
+    <button class="sm" onclick="newScreener('cond')">+ Kondisi</button>
+    <button class="sm" onclick="newScreener('spike')">+ Spike-Pullback</button>
+  </div>
+  <h3>Backup</h3>
+  <div class="row">
+    <button class="sm" onclick="exportScreeners()">Ekspor</button>
+    <button class="sm" onclick="document.getElementById('imp').click()">Impor</button>
+    <input type="file" id="imp" accept=".json" style="display:none" onchange="importScreeners(this)">
+  </div>
+  <p class="desc">Screener custom disimpan di browser ini. Pakai Ekspor/Impor untuk memindahkan ke HP/laptop lain.</p>
+</aside>
+<main>
+  <div class="card" id="editor"></div>
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="status" id="status">Pilih screener lalu klik Jalankan.</div>
+      <button class="sm" id="csvBtn" onclick="exportCSV()" disabled>Unduh CSV</button>
+    </div>
+    <div class="tblwrap" style="margin-top:10px"><table id="tbl"></table></div>
+  </div>
+  <div class="card chartbox" id="chartbox">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px">
+      <b id="chartTitle"></b><span class="links" id="chartLinks"></span>
+    </div>
+    <canvas id="cv"></canvas>
+  </div>
+</main>
+</div>
+
+<script>
+/* ======================= DATA ======================= */
+let DATA = null, STOCKS = {}, LASTIDX = 0, DEMO = false;
+
+async function loadData(){
+  try{
+    const r = await fetch('data/eod.json?v=' + Date.now());
+    if(!r.ok) throw 0;
+    DATA = await r.json();
+  }catch(e){ DATA = makeDemo(); DEMO = true; }
+  LASTIDX = DATA.dates.length - 1;
+  for(const [code, rows] of Object.entries(DATA.t)){
+    const s = {code, D:[], O:[], H:[], L:[], C:[], V:[]};
+    rows.forEach((r, di) => { if(r){ s.D.push(di); s.O.push(r[0]); s.H.push(r[1]); s.L.push(r[2]); s.C.push(r[3]); s.V.push(r[4]); } });
+    if(s.C.length >= 30) STOCKS[code] = s;
+  }
+  const b = document.getElementById('dataBadge');
+  if(DEMO){ b.textContent = 'DATA DEMO'; b.className = 'badge'; }
+  else { b.textContent = 'data EOD'; b.className = 'badge ok'; }
+  document.getElementById('dataMeta').textContent =
+    `${Object.keys(STOCKS).length} saham · data terakhir ${DATA.dates[LASTIDX]}` +
+    (DEMO ? ' · data/eod.json belum ada, memakai data acak untuk uji tampilan' : ` · diperbarui ${DATA.generated.replace('T',' ').slice(0,16)} UTC`);
+}
+
+function makeDemo(){
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const n = 140, dates = [];
+  const d0 = new Date('2026-05-04');
+  for(let k = 0; dates.length < n; k++){ const d = new Date(d0.getTime() + k*864e5); if(d.getDay()%6) dates.push(d.toISOString().slice(0,10)); }
+  const t = {};
+  for(let s = 0; s < 150; s++){
+    const code = 'DM' + String(s).padStart(2,'0');
+    let c = 100 + rnd()*4900, baseV = 2e6 + rnd()*5e7; const rows = [];
+    const pat = s % 8 === 0, spikeAt = n - 2 - Math.floor(rnd()*4);
+    for(let i = 0; i < n; i++){
+      let o = c * (1 + (rnd()-.5)*.01), ch = (rnd()-.48)*.05, v = baseV * (.6 + rnd()*.8);
+      if(pat && i === spikeAt){ o = c; ch = .07 + rnd()*.08; v = baseV*3.5; }
+      if(pat && i > spikeAt){ ch = -.01 - rnd()*.012; v = baseV*.9; }
+      const cl = Math.max(50, o*(1+ch));
+      rows.push([Math.round(o), Math.round(Math.max(o,cl)*(1+rnd()*.01)), Math.round(Math.min(o,cl)*(1-rnd()*.01)), Math.round(cl), Math.round(v)]);
+      c = cl;
+    }
+    t[code] = rows;
+  }
+  return {generated: new Date().toISOString(), dates, t};
+}
+
+/* ======================= INDIKATOR ======================= */
+const avg = (a, from, to) => { if(from < 0) return NaN; let s = 0; for(let k = from; k <= to; k++) s += a[k]; return s / (to - from + 1); };
+const mx = (a, from, to) => { let m = -Infinity; for(let k = Math.max(0,from); k <= to; k++) m = Math.max(m, a[k]); return m; };
+const mn = (a, from, to) => { let m = Infinity; for(let k = Math.max(0,from); k <= to; k++) m = Math.min(m, a[k]); return m; };
+function rsi(C, i, n){
+  if(i < n*3) return NaN;
+  let g = 0, l = 0;
+  for(let k = i - n*3 + 1; k <= i - n*2; k++){ const d = C[k]-C[k-1]; d > 0 ? g += d : l -= d; }
+  g /= n; l /= n;
+  for(let k = i - n*2 + 1; k <= i; k++){ const d = C[k]-C[k-1]; g = (g*(n-1) + Math.max(d,0))/n; l = (l*(n-1) + Math.max(-d,0))/n; }
+  return l === 0 ? 100 : 100 - 100/(1 + g/l);
+}
+
+const METRICS = {
+  chg:   {label:'Perubahan harga N hari (%)', n:1,  f:(s,i,n) => i-n < 0 ? NaN : (s.C[i]/s.C[i-n]-1)*100},
+  volx:  {label:'Volume ÷ VMA N (x)',          n:20, f:(s,i,n) => s.V[i] / avg(s.V, i-n, i-1)},
+  ma:    {label:'Close vs MA N (%)',           n:20, f:(s,i,n) => (s.C[i] / avg(s.C, i-n+1, i) - 1)*100},
+  hh:    {label:'Jarak ke High N hari (%)',    n:60, f:(s,i,n) => (s.C[i] / mx(s.H, i-n+1, i) - 1)*100},
+  ll:    {label:'Jarak dari Low N hari (%)',   n:60, f:(s,i,n) => (s.C[i] / mn(s.L, i-n+1, i) - 1)*100},
+  rsi:   {label:'RSI N',                       n:14, f:(s,i,n) => rsi(s.C, i, n)},
+  value: {label:'Nilai transaksi rata² N hari (Rp M)', n:20, f:(s,i,n) => { let t=0; for(let k=i-n+1;k<=i;k++) t += s.C[k]*s.V[k]; return i-n+1<0 ? NaN : t/n/1e9; }},
+  body:  {label:'Body candle (%)',             n:null, f:(s,i) => (s.C[i]/s.O[i]-1)*100},
+  price: {label:'Harga close (Rp)',            n:null, f:(s,i) => s.C[i]},
+};
+const OPS = {'>':(a,b)=>a>b, '>=':(a,b)=>a>=b, '<':(a,b)=>a<b, '<=':(a,b)=>a<=b};
+
+/* ======================= ENGINE ======================= */
+function avgValue(s, i, n=20){ return METRICS.value.f(s, i, n); }
+
+function runCond(sc, s){
+  const i = s.C.length - 1, out = {};
+  for(const c of sc.conds){
+    const j = i - (+c.offset || 0);
+    if(j < 1) return null;
+    const v = METRICS[c.metric].f(s, j, +c.n);
+    if(!isFinite(v) || !OPS[c.op](v, +c.value)) return null;
+    out[condKey(c)] = v;
+  }
+  return out;
+}
+
+function runSpike(sc, s){
+  const p = sc.p, n = s.C.length;
+  for(let k = +p.minDays; k <= +p.maxDays; k++){
+    const i = n - 1 - k;
+    if(i < +p.vmaLen + 1) break;
+    const chg = (s.C[i]/s.C[i-1]-1)*100, vma = avg(s.V, i - p.vmaLen, i - 1);
+    if(!(chg > +p.minGain && s.V[i] >= p.volMult * vma)) continue;
+    let ok = true, maxV = 0;
+    for(let j = i+1; j < n; j++){
+      maxV = Math.max(maxV, s.V[j]);
+      if(s.V[j] >= p.pullVol/100 * s.V[i]) ok = false;
+      if((p.useLow ? s.L[j] : s.C[j]) < s.O[i]) ok = false;
+    }
+    if(p.requireRed && s.C[n-1] >= s.C[i]) ok = false;
+    if(!ok) return null;               // spike terbaru gagal syarat → tidak cari spike lebih lama
+    return {_spike: i, 'Tgl spike': DATA.dates[s.D[i]], 'Hari stlh': k, 'Spike %': chg, 'Vol/VMA': s.V[i]/vma,
+            'Open spike': s.O[i], 'Ke open spike %': (s.C[n-1]/s.O[i]-1)*100, 'Vol koreksi maks % spike': maxV/s.V[i]*100};
+  }
+  return null;
+}
+
+let RESULTS = [], COLS = [], SORT = {k:null, d:-1};
+function run(){
+  const sc = readEditor();
+  const t0 = performance.now(), res = [];
+  for(const s of Object.values(STOCKS)){
+    if(sc.activeOnly && s.D[s.D.length-1] !== LASTIDX) continue;
+    const i = s.C.length - 1;
+    const val = avgValue(s, i);
+    if(!(val >= +sc.minValue)) continue;
+    const r = sc.type === 'spike' ? runSpike(sc, s) : runCond(sc, s);
+    if(r) res.push({Kode: s.code, Close: s.C[i], 'Chg 1H %': METRICS.chg.f(s,i,1), 'Nilai 20H (Rp M)': val, ...r});
+  }
+  RESULTS = res;
+  COLS = res.length ? Object.keys(res[0]).filter(k => !k.startsWith('_')) : [];
+  SORT = {k: sc.type === 'spike' ? 'Hari stlh' : 'Chg 1H %', d: sc.type === 'spike' ? 1 : -1};
+  renderTable();
+  document.getElementById('status').textContent =
+    `${sc.name}: ${res.length} saham lolos dari ${Object.keys(STOCKS).length} · ${(performance.now()-t0).toFixed(0)} ms · data ${DATA.dates[LASTIDX]}`;
+  document.getElementById('csvBtn').disabled = !res.length;
+}
+
+/* ======================= SCREENER STORE ======================= */
+const PRESETS = [
+  {id:'p_spike', preset:true, type:'spike', name:'Spike → Pullback volume rendah', minValue:1, activeOnly:true,
+   desc:'Close > +5% & volume ≥ 2x VMA20, lalu koreksi dengan volume tiap hari < 60% spike, harga belum di bawah open spike.',
+   p:{minGain:5, volMult:2, vmaLen:20, pullVol:60, minDays:1, maxDays:5, useLow:false, requireRed:true}},
+  {id:'p_vbo', preset:true, type:'cond', name:'Volume Breakout', minValue:1, activeOnly:true,
+   desc:'Naik > 3% hari ini, volume > 2x VMA20, di atas MA20.',
+   conds:[{metric:'chg',n:1,op:'>',value:3,offset:0},{metric:'volx',n:20,op:'>',value:2,offset:0},{metric:'ma',n:20,op:'>',value:0,offset:0}]},
+  {id:'p_ma20', preset:true, type:'cond', name:'Uptrend pullback ke MA20', minValue:1, activeOnly:true,
+   desc:'Di atas MA50, harga dalam ±2% dari MA20, volume hari ini di bawah rata-rata.',
+   conds:[{metric:'ma',n:50,op:'>',value:0,offset:0},{metric:'ma',n:20,op:'>=',value:-2,offset:0},{metric:'ma',n:20,op:'<=',value:2,offset:0},{metric:'volx',n:20,op:'<',value:1,offset:0}]},
+  {id:'p_hh', preset:true, type:'cond', name:'Dekat High 60 hari', minValue:1, activeOnly:true,
+   desc:'Close dalam 3% dari high 60 hari, volume > 1.2x VMA20.',
+   conds:[{metric:'hh',n:60,op:'>=',value:-3,offset:0},{metric:'volx',n:20,op:'>',value:1.2,offset:0}]},
+  {id:'p_os', preset:true, type:'cond', name:'Oversold RSI', minValue:2, activeOnly:true,
+   desc:'RSI14 < 30, likuid (nilai rata² ≥ Rp2 M).',
+   conds:[{metric:'rsi',n:14,op:'<',value:30,offset:0}]},
+];
+const LS = 'idxScreener.v1';
+let CUSTOM = []; try{ CUSTOM = JSON.parse(localStorage.getItem(LS)) || []; }catch(e){}
+const saveLS = () => { try{ localStorage.setItem(LS, JSON.stringify(CUSTOM)); }catch(e){ alert('Gagal menyimpan di browser ini.'); } };
+let CUR = null;
+
+function renderLists(){
+  const item = sc => `<div class="sc ${CUR && CUR.id===sc.id?'active':''}" onclick="selectSc('${sc.id}')"><b>${esc(sc.name)}</b><small>${sc.type==='spike'?'Spike-Pullback':sc.conds.length+' kondisi'}</small></div>`;
+  document.getElementById('listPreset').innerHTML = PRESETS.map(item).join('');
+  document.getElementById('listCustom').innerHTML = CUSTOM.length ? CUSTOM.map(item).join('') : '<div class="desc">Belum ada. Buat dari tombol di bawah, atau edit preset lalu "Simpan sebagai baru".</div>';
+}
+function selectSc(id){ CUR = structuredClone([...PRESETS, ...CUSTOM].find(s => s.id === id)); renderLists(); renderEditor(); run(); }
+function newScreener(type){
+  CUR = type === 'spike' ? structuredClone({...PRESETS[0], id:null, preset:false, name:'Spike-Pullback saya', desc:''})
+                         : {id:null, preset:false, type:'cond', name:'Screener baru', minValue:1, activeOnly:true, desc:'', conds:[{metric:'chg',n:1,op:'>',value:2,offset:0}]};
+  renderLists(); renderEditor();
+}
+
+/* ======================= EDITOR ======================= */
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = (k, v, label, step='any') => `<label class="f">${label}<input type="number" step="${step}" data-k="${k}" value="${v}"></label>`;
+function condKey(c){ const m = METRICS[c.metric]; return m.label.replace(/ N/, m.n!==null?' '+c.n:'')+(+c.offset?` [H-${c.offset}]`:''); }
+
+function renderEditor(){
+  const sc = CUR, e = document.getElementById('editor');
+  let body = '';
+  if(sc.type === 'spike'){
+    const p = sc.p;
+    body = `<div class="grid">
+      ${num('p.minGain', p.minGain, 'Kenaikan hari spike > (%)')}
+      ${num('p.volMult', p.volMult, 'Volume spike ≥ (x VMA)')}
+      ${num('p.vmaLen', p.vmaLen, 'Panjang VMA', 1)}
+      ${num('p.pullVol', p.pullVol, 'Volume koreksi < (% spike)')}
+      ${num('p.minDays', p.minDays, 'Spike min. N hari lalu', 1)}
+      ${num('p.maxDays', p.maxDays, 'Spike maks. N hari lalu', 1)}
+    </div>
+    <div class="row" style="margin-top:12px;gap:22px">
+      <label class="chk"><input type="checkbox" data-k="p.useLow" ${p.useLow?'checked':''}> Low tidak boleh tembus open spike (lebih ketat)</label>
+      <label class="chk"><input type="checkbox" data-k="p.requireRed" ${p.requireRed?'checked':''}> Close terakhir harus di bawah close spike</label>
+    </div>`;
+  } else {
+    body = `<div id="conds">${sc.conds.map((c, idx) => `
+      <div class="cond">
+        <span class="lbl">${idx ? 'DAN' : 'JIKA'}</span>
+        <select data-c="${idx}" data-f="metric" onchange="syncEditor();renderEditor()">${Object.entries(METRICS).map(([k,m]) => `<option value="${k}" ${k===c.metric?'selected':''}>${m.label}</option>`).join('')}</select>
+        ${METRICS[c.metric].n !== null ? `<label class="chk">N <input type="number" step="1" data-c="${idx}" data-f="n" value="${c.n}" style="width:64px"></label>` : ''}
+        <select data-c="${idx}" data-f="op">${Object.keys(OPS).map(o => `<option ${o===c.op?'selected':''}>${o}</option>`).join('')}</select>
+        <input type="number" step="any" data-c="${idx}" data-f="value" value="${c.value}">
+        <select data-c="${idx}" data-f="offset" title="Hari yang dicek">${[0,1,2,3,4,5].map(o => `<option value="${o}" ${o==c.offset?'selected':''}>${o?'H-'+o:'Hari terakhir'}</option>`).join('')}</select>
+        <button class="sm danger" onclick="syncEditor();CUR.conds.splice(${idx},1);renderEditor()">✕</button>
+      </div>`).join('')}</div>
+      <button class="sm" style="margin-top:6px" onclick="syncEditor();CUR.conds.push({metric:'volx',n:20,op:'>',value:1.5,offset:0});renderEditor()">+ Tambah kondisi</button>`;
+  }
+  e.innerHTML = `
+    <div class="row" style="justify-content:space-between">
+      <input class="name" data-k="name" value="${esc(sc.name)}">
+      <div class="row">
+        <button class="primary" onclick="run()">▶ Jalankan</button>
+        ${sc.preset ? '' : '<button onclick="saveSc(false)">Simpan</button>'}
+        <button onclick="saveSc(true)">Simpan sebagai baru</button>
+        ${sc.preset || !sc.id ? '' : '<button class="danger" onclick="delSc()">Hapus</button>'}
+      </div>
+    </div>
+    ${sc.desc ? `<div class="desc">${esc(sc.desc)}</div>` : ''}
+    ${body}
+    <div class="row" style="margin-top:14px;gap:22px;border-top:1px solid var(--line);padding-top:12px">
+      ${num('minValue', sc.minValue, 'Filter likuiditas: nilai rata² 20H ≥ (Rp M)')}
+      <label class="chk"><input type="checkbox" data-k="activeOnly" ${sc.activeOnly?'checked':''}> Hanya saham yang bertransaksi di hari terakhir</label>
+    </div>`;
+}
+function syncEditor(){
+  const e = document.getElementById('editor');
+  e.querySelectorAll('[data-k]').forEach(el => {
+    const v = el.type === 'checkbox' ? el.checked : el.type === 'number' ? +el.value : el.value;
+    const ks = el.dataset.k.split('.'); ks.length === 2 ? CUR[ks[0]][ks[1]] = v : CUR[ks[0]] = v;
+  });
+  e.querySelectorAll('[data-c]').forEach(el => { CUR.conds[+el.dataset.c][el.dataset.f] = el.tagName === 'SELECT' && el.dataset.f !== 'offset' ? el.value : +el.value; });
+}
+function readEditor(){ syncEditor(); return CUR; }
+function saveSc(asNew){
+  syncEditor();
+  if(asNew || !CUR.id){ CUR = {...structuredClone(CUR), id:'c_'+Date.now(), preset:false}; if(asNew && CUSTOM.some(s=>s.name===CUR.name)) CUR.name += ' (salinan)'; CUSTOM.push(structuredClone(CUR)); }
+  else { CUSTOM[CUSTOM.findIndex(s => s.id === CUR.id)] = structuredClone(CUR); }
+  saveLS(); renderLists(); renderEditor();
+}
+function delSc(){ if(!confirm('Hapus screener "'+CUR.name+'"?')) return; CUSTOM = CUSTOM.filter(s => s.id !== CUR.id); saveLS(); selectSc(PRESETS[0].id); }
+function exportScreeners(){ download('screeners.json', JSON.stringify(CUSTOM, null, 2), 'application/json'); }
+function importScreeners(inp){
+  const f = inp.files[0]; if(!f) return;
+  f.text().then(t => { try{ const arr = JSON.parse(t); arr.forEach(s => { s.id = 'c_'+Date.now()+Math.random().toString(36).slice(2,6); s.preset = false; CUSTOM.push(s); }); saveLS(); renderLists(); alert(arr.length+' screener diimpor.'); }catch(e){ alert('File tidak valid.'); } });
+  inp.value = '';
+}
+
+/* ======================= TABEL ======================= */
+const fmt = (k, v) => typeof v !== 'number' ? esc(v) :
+  (k==='Close'||k==='Open spike'||k.startsWith('Harga')) ? v.toLocaleString('id-ID') :
+  (k==='Hari stlh') ? v : v.toLocaleString('id-ID', {maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 2});
+function renderTable(){
+  const t = document.getElementById('tbl');
+  if(!RESULTS.length){ t.innerHTML = '<tr><td class="empty">Tidak ada saham yang lolos.</td></tr>'; document.getElementById('chartbox').style.display='none'; return; }
+  const rows = [...RESULTS].sort((a,b) => { const x=a[SORT.k], y=b[SORT.k]; return (typeof x==='string' ? x.localeCompare(y) : x-y) * SORT.d; });
+  t.innerHTML = `<thead><tr>${COLS.map(c => `<th onclick="sortBy('${c}')">${c}${SORT.k===c?(SORT.d>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map(r => `<tr onclick="showChart('${r.Kode}', this)">${COLS.map(c => {
+      const v = r[c], cls = (c.includes('%') && typeof v==='number') ? (v>0?'pos':v<0?'neg':'') : '';
+      return `<td class="${cls}">${c==='Kode'?'<b>'+v+'</b>':fmt(c,v)}</td>`; }).join('')}</tr>`).join('')}</tbody>`;
+}
+function sortBy(k){ SORT = {k, d: SORT.k===k ? -SORT.d : -1}; renderTable(); }
+function exportCSV(){
+  const lines = [COLS.join(',')].concat(RESULTS.map(r => COLS.map(c => typeof r[c]==='number' ? +r[c].toFixed(3) : '"'+r[c]+'"').join(',')));
+  download(`screener_${(CUR.name||'hasil').replace(/\W+/g,'_')}_${DATA.dates[LASTIDX]}.csv`, lines.join('\n'), 'text/csv');
+}
+function download(name, text, type){ const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; a.click(); }
+
+/* ======================= CHART ======================= */
+function showChart(code, tr){
+  document.querySelectorAll('tbody tr.sel').forEach(x => x.classList.remove('sel')); tr && tr.classList.add('sel');
+  const s = STOCKS[code], r = RESULTS.find(x => x.Kode === code);
+  const box = document.getElementById('chartbox'); box.style.display = 'block';
+  document.getElementById('chartTitle').textContent = `${code} · ${s.C[s.C.length-1].toLocaleString('id-ID')}`;
+  document.getElementById('chartLinks').innerHTML = DEMO ? '' :
+    `<a href="https://www.tradingview.com/chart/?symbol=IDX:${code}" target="_blank" rel="noopener">TradingView ↗</a><a href="https://stockbit.com/symbol/${code}" target="_blank" rel="noopener">Stockbit ↗</a>`;
+  const cv = document.getElementById('cv'), dpr = devicePixelRatio || 1, W = cv.clientWidth, H = 340;
+  cv.width = W*dpr; cv.height = H*dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0,0,W,H);
+  const N = Math.min(90, s.C.length), st = s.C.length - N, padR = 64, pH = 240, vTop = 255, vH = 70;
+  let hi = mx(s.H, st, s.C.length-1), lo = mn(s.L, st, s.C.length-1); const pad = (hi-lo)*.06; hi += pad; lo -= pad;
+  const vmax = mx(s.V, st, s.C.length-1), bw = (W - padR) / N;
+  const y = p => 8 + (hi - p) / (hi - lo) * (pH - 8), x = k => (k - st + .5) * bw;
+  g.font = '11px Inter, sans-serif'; g.fillStyle = '#8590a0'; g.strokeStyle = '#222a35'; g.lineWidth = 1;
+  for(let k = 0; k <= 4; k++){ const p = lo + (hi-lo)*k/4, yy = y(p); g.beginPath(); g.moveTo(0,yy); g.lineTo(W-padR,yy); g.stroke(); g.fillText(Math.round(p).toLocaleString('id-ID'), W-padR+6, yy+4); }
+  // MA20
+  g.strokeStyle = '#5b8cff'; g.beginPath(); let started = false;
+  for(let k = st; k < s.C.length; k++){ if(k < 19) continue; const m = avg(s.C, k-19, k); started ? g.lineTo(x(k), y(m)) : (g.moveTo(x(k), y(m)), started = true); } g.stroke();
+  for(let k = st; k < s.C.length; k++){
+    const up = s.C[k] >= s.O[k], col = up ? '#22c55e' : '#ef4444', xx = x(k);
+    g.strokeStyle = g.fillStyle = col;
+    g.beginPath(); g.moveTo(xx, y(s.H[k])); g.lineTo(xx, y(s.L[k])); g.stroke();
+    const t1 = y(Math.max(s.O[k], s.C[k])), t2 = y(Math.min(s.O[k], s.C[k]));
+    g.fillRect(xx - bw*.35, t1, bw*.7, Math.max(1, t2 - t1));
+    g.globalAlpha = .45; g.fillRect(xx - bw*.35, vTop + vH - s.V[k]/vmax*vH, bw*.7, s.V[k]/vmax*vH); g.globalAlpha = 1;
+  }
+  if(r && r._spike !== undefined){
+    const i = r._spike; g.strokeStyle = '#f5a524'; g.setLineDash([5,4]);
+    g.beginPath(); g.moveTo(x(i), y(s.O[i])); g.lineTo(W-padR, y(s.O[i])); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#f5a524'; g.fillText('open spike', x(i), y(s.O[i]) + 13);
+    g.beginPath(); g.moveTo(x(i), vTop - 2); g.lineTo(x(i)-5, vTop - 10); g.lineTo(x(i)+5, vTop - 10); g.fill();
+  }
+  g.fillStyle = '#8590a0'; g.fillText(DATA.dates[s.D[st]], 2, H - 4);
+  const lt = DATA.dates[s.D[s.C.length-1]]; g.fillText(lt, W - padR - g.measureText(lt).width, H - 4);
+  g.fillStyle = '#5b8cff'; g.fillText('— MA20', 4, 18);
+}
+
+/* ======================= INIT ======================= */
+loadData().then(() => { renderLists(); selectSc(PRESETS[0].id); });
+</script>
+</body>
+</html>

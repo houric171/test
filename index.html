@@ -113,6 +113,7 @@ async function loadData(){
   for(const [code, rows] of Object.entries(DATA.t)){
     const s = {code, D:[], O:[], H:[], L:[], C:[], V:[]};
     rows.forEach((r, di) => { if(r){ s.D.push(di); s.O.push(r[0]); s.H.push(r[1]); s.L.push(r[2]); s.C.push(r[3]); s.V.push(r[4]); } });
+    s.shares = (DATA.shares || {})[code] || null;
     if(s.C.length >= 30) STOCKS[code] = s;
   }
   const b = document.getElementById('dataBadge');
@@ -128,7 +129,7 @@ function makeDemo(){
   const n = 140, dates = [];
   const d0 = new Date('2026-05-04');
   for(let k = 0; dates.length < n; k++){ const d = new Date(d0.getTime() + k*864e5); if(d.getDay()%6) dates.push(d.toISOString().slice(0,10)); }
-  const t = {};
+  const t = {}, sh = {};
   for(let s = 0; s < 150; s++){
     const code = 'DM' + String(s).padStart(2,'0');
     let c = 100 + rnd()*4900, baseV = 2e6 + rnd()*5e7; const rows = [];
@@ -141,9 +142,9 @@ function makeDemo(){
       rows.push([Math.round(o), Math.round(Math.max(o,cl)*(1+rnd()*.01)), Math.round(Math.min(o,cl)*(1-rnd()*.01)), Math.round(cl), Math.round(v)]);
       c = cl;
     }
-    t[code] = rows;
+    t[code] = rows; sh[code] = Math.round((2e8 + rnd()*3e10));
   }
-  return {generated: new Date().toISOString(), dates, t};
+  return {generated: new Date().toISOString(), dates, t, shares: sh};
 }
 
 /* ======================= INDIKATOR ======================= */
@@ -168,6 +169,7 @@ const METRICS = {
   rsi:   {label:'RSI N',                       n:14, f:(s,i,n) => rsi(s.C, i, n)},
   value: {label:'Nilai transaksi rata² N hari (Rp M)', n:20, f:(s,i,n) => { let t=0; for(let k=i-n+1;k<=i;k++) t += s.C[k]*s.V[k]; return i-n+1<0 ? NaN : t/n/1e9; }},
   body:  {label:'Body candle (%)',             n:null, f:(s,i) => (s.C[i]/s.O[i]-1)*100},
+  mcap:  {label:'Market cap (Rp T)',          n:null, f:(s,i) => s.shares ? s.C[i]*s.shares/1e12 : NaN},
   price: {label:'Harga close (Rp)',            n:null, f:(s,i) => s.C[i]},
 };
 const OPS = {'>':(a,b)=>a>b, '>=':(a,b)=>a>=b, '<':(a,b)=>a<b, '<=':(a,b)=>a<=b};
@@ -215,10 +217,14 @@ function run(){
   for(const s of Object.values(STOCKS)){
     if(sc.activeOnly && s.D[s.D.length-1] !== LASTIDX) continue;
     const i = s.C.length - 1;
-    const val = avgValue(s, i);
-    if(!(val >= +sc.minValue)) continue;
+    const val = avgValue(s, i), val1 = s.C[i]*s.V[i]/1e9, mcap = METRICS.mcap.f(s, i);
+    if(!(val >= (+sc.minValue || 0))) continue;
+    if(!(val1 >= (+sc.minValue1 || 0))) continue;
+    if((+sc.mcapMin || +sc.mcapMax) && !isFinite(mcap)) continue;
+    if(+sc.mcapMin && mcap < +sc.mcapMin) continue;
+    if(+sc.mcapMax && mcap > +sc.mcapMax) continue;
     const r = sc.type === 'spike' ? runSpike(sc, s) : runCond(sc, s);
-    if(r) res.push({Kode: s.code, Close: s.C[i], 'Chg 1H %': METRICS.chg.f(s,i,1), 'Nilai 20H (Rp M)': val, ...r});
+    if(r) res.push({Kode: s.code, Close: s.C[i], 'Chg 1H %': METRICS.chg.f(s,i,1), 'Nilai 1H (Rp M)': val1, 'Nilai 20H (Rp M)': val, 'Mcap (Rp T)': isFinite(mcap) ? mcap : '–', ...r});
   }
   RESULTS = res;
   COLS = res.length ? Object.keys(res[0]).filter(k => !k.startsWith('_')) : [];
@@ -312,7 +318,12 @@ function renderEditor(){
     ${sc.desc ? `<div class="desc">${esc(sc.desc)}</div>` : ''}
     ${body}
     <div class="row" style="margin-top:14px;gap:22px;border-top:1px solid var(--line);padding-top:12px">
-      ${num('minValue', sc.minValue, 'Filter likuiditas: nilai rata² 20H ≥ (Rp M)')}
+      <label class="f">Nilai transaksi hari terakhir ≥ (Rp M)
+        <span class="row" style="gap:6px"><input type="number" step="any" data-k="minValue1" value="${sc.minValue1 ?? 0}">
+        ${[0,2,10,50].map(v => `<button class="sm chip" onclick="setF('minValue1',${v})">${v ? '≥'+v+' M' : 'Semua'}</button>`).join('')}</span></label>
+      ${num('minValue', sc.minValue ?? 0, 'Nilai rata² 20H ≥ (Rp M)')}
+      ${num('mcapMin', sc.mcapMin ?? 0, 'Market cap min (Rp T, 0=bebas)')}
+      ${num('mcapMax', sc.mcapMax ?? 0, 'Market cap maks (Rp T, 0=bebas)')}
       <label class="chk"><input type="checkbox" data-k="activeOnly" ${sc.activeOnly?'checked':''}> Hanya saham yang bertransaksi di hari terakhir</label>
     </div>`;
 }
@@ -324,6 +335,7 @@ function syncEditor(){
   });
   e.querySelectorAll('[data-c]').forEach(el => { CUR.conds[+el.dataset.c][el.dataset.f] = el.tagName === 'SELECT' && el.dataset.f !== 'offset' ? el.value : +el.value; });
 }
+function setF(k, v){ syncEditor(); CUR[k] = v; renderEditor(); run(); }
 function readEditor(){ syncEditor(); return CUR; }
 function saveSc(asNew){
   syncEditor();
@@ -342,11 +354,11 @@ function importScreeners(inp){
 /* ======================= TABEL ======================= */
 const fmt = (k, v) => typeof v !== 'number' ? esc(v) :
   (k==='Close'||k==='Open spike'||k.startsWith('Harga')) ? v.toLocaleString('id-ID') :
-  (k==='Hari stlh') ? v : v.toLocaleString('id-ID', {maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 2});
+  (k==='Hari stlh') ? v : k.startsWith('Mcap') ? v.toLocaleString('id-ID', {maximumFractionDigits: v < 10 ? 2 : 1}) : v.toLocaleString('id-ID', {maximumFractionDigits: Math.abs(v) >= 100 ? 0 : 2});
 function renderTable(){
   const t = document.getElementById('tbl');
   if(!RESULTS.length){ t.innerHTML = '<tr><td class="empty">Tidak ada saham yang lolos.</td></tr>'; document.getElementById('chartbox').style.display='none'; return; }
-  const rows = [...RESULTS].sort((a,b) => { const x=a[SORT.k], y=b[SORT.k]; return (typeof x==='string' ? x.localeCompare(y) : x-y) * SORT.d; });
+  const rows = [...RESULTS].sort((a,b) => { const x=a[SORT.k], y=b[SORT.k]; if(typeof x!==typeof y) return typeof x==='string' ? 1 : -1; return (typeof x==='string' ? x.localeCompare(y) : x-y) * SORT.d; });
   t.innerHTML = `<thead><tr>${COLS.map(c => `<th onclick="sortBy('${c}')">${c}${SORT.k===c?(SORT.d>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr onclick="showChart('${r.Kode}', this)">${COLS.map(c => {
       const v = r[c], cls = (c.includes('%') && typeof v==='number') ? (v>0?'pos':v<0?'neg':'') : '';

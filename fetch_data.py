@@ -53,6 +53,33 @@ for code, df in frames.items():
         out["t"][code] = rows
 
 os.makedirs("data", exist_ok=True)
+# ---- Jumlah saham beredar (untuk market cap) ----
+# Basis: shares.csv (dari data BEI). Setiap Senin (atau REFRESH_SHARES=1) dicoba
+# diperbarui dari Yahoo; kalau Yahoo gagal, angka lama tetap dipakai.
+import csv, os as _os
+from concurrent.futures import ThreadPoolExecutor
+shares = {}
+if _os.path.exists("shares.csv"):
+    for r in csv.DictReader(open("shares.csv")):
+        try: shares[r["code"]] = int(float(r["shares"]))
+        except Exception: pass
+if dt.datetime.utcnow().weekday() == 0 or _os.environ.get("REFRESH_SHARES") == "1":
+    def get_sh(code):
+        try:
+            v = yf.Ticker(code + ".JK").fast_info["shares"]
+            return code, int(v) if v and v > 0 else None
+        except Exception:
+            return code, None
+    with ThreadPoolExecutor(8) as ex:
+        upd = [r for r in ex.map(get_sh, list(out["t"])) if r[1]]
+    for code, v in upd:
+        shares[code] = v
+    with open("shares.csv", "w", newline="") as f:
+        w = csv.writer(f); w.writerow(["code", "shares"])
+        for code in sorted(shares): w.writerow([code, shares[code]])
+    print(f"Shares diperbarui dari Yahoo: {len(upd)} saham")
+out["shares"] = {c: shares[c] for c in out["t"] if c in shares}
+
 with open("data/eod.json", "w") as f:
     json.dump(out, f, separators=(",", ":"))
 print(f"Selesai: {len(out['t'])} saham, {len(dates)} hari, terakhir {out['dates'][-1]}")

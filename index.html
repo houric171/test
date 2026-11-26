@@ -118,12 +118,20 @@ async function loadData(){
   }
   const b = document.getElementById('dataBadge');
   if(DEMO){ b.textContent = 'DATA DEMO'; b.className = 'badge'; }
+  else if(DATA.dates[LASTIDX] < expectedDate()){ b.textContent = 'data mungkin belum update (harusnya ' + expectedDate() + ')'; b.className = 'badge'; }
   else { b.textContent = 'data EOD'; b.className = 'badge ok'; }
   document.getElementById('dataMeta').textContent =
     `${Object.keys(STOCKS).length} saham · data terakhir ${DATA.dates[LASTIDX]}` +
     (DEMO ? ' · data/eod.json belum ada, memakai data acak untuk uji tampilan' : ` · diperbarui ${DATA.generated.replace('T',' ').slice(0,16)} UTC`);
 }
 
+// hari bursa terakhir yang seharusnya sudah ada (WIB, data dianggap siap jam 18:00; libur bursa tidak dihitung)
+function expectedDate(){
+  const d = new Date(Date.now() + 7*3600e3);           // waktu WIB
+  if(d.getUTCHours() < 18) d.setUTCDate(d.getUTCDate() - 1);
+  while(d.getUTCDay() === 0 || d.getUTCDay() === 6) d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0,10);
+}
 function makeDemo(){
   let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   const n = 140, dates = [];

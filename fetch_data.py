@@ -82,4 +82,8 @@ out["shares"] = {c: shares[c] for c in out["t"] if c in shares}
 
 with open("data/eod.json", "w") as f:
     json.dump(out, f, separators=(",", ":"))
+# diagnosa: berapa saham yang punya data di 3 tanggal terakhir
+for k in range(1, 4):
+    di = len(out["dates"]) - k
+    print("  ", out["dates"][di], "->", sum(1 for r in out["t"].values() if r[di] is not None), "saham")
 print(f"Selesai: {len(out['t'])} saham, {len(dates)} hari, terakhir {out['dates'][-1]}")
